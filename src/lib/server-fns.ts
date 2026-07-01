@@ -248,3 +248,111 @@ export const getStudents = createServerFn({ method: "POST" })
     const result = await db.select().from(students).where(eq(students.classroomId, data.classroomId));
     return { students: result };
   });
+
+// --- Photo Gallery ---
+
+export const getChildReports = createServerFn({ method: "POST" })
+  .validator((data: { sessionToken: string }) => data)
+  .handler(async ({ data }) => {
+    const { validateSessionToken } = await import("./auth-server");
+    const user = await validateSessionToken(data.sessionToken);
+    if (!user || user.role !== "parent") return { error: "Not authorized", reports: [], students: [] };
+    
+    const { db } = await import("../db/index");
+    const { students, dailyReports, reportPhotos, classrooms } = await import("../db/schema");
+    const { eq, and, desc } = await import("drizzle-orm");
+    
+    // Get parent's children
+    const parentStudents = await db.select().from(students).where(eq(students.parentId, user.id));
+    
+    // Get reports for their classrooms
+    const classroomIds = [...new Set(parentStudents.map(s => s.classroomId))];
+    const reports: any[] = [];
+    
+    for (const cId of classroomIds) {
+      const classReports = await db.select()
+        .from(dailyReports)
+        .where(and(eq(dailyReports.classroomId, cId), eq(dailyReports.status, "sent")))
+        .orderBy(desc(dailyReports.date))
+        .limit(20);
+      
+      for (const report of classReports) {
+        const photos = await db.select().from(reportPhotos).where(eq(reportPhotos.reportId, report.id));
+        const [classroom] = await db.select().from(classrooms).where(eq(classrooms.id, cId)).limit(1);
+        reports.push({ ...report, photos, classroomName: classroom?.name });
+      }
+    }
+    
+    return { reports, students: parentStudents };
+  });
+
+// --- Messaging ---
+
+export const sendMessage = createServerFn({ method: "POST" })
+  .validator((data: { sessionToken: string; recipientId: string; subject?: string; body: string }) => data)
+  .handler(async ({ data }) => {
+    const { validateSessionToken } = await import("./auth-server");
+    const user = await validateSessionToken(data.sessionToken);
+    if (!user) return { error: "Not authenticated" };
+    
+    const { db } = await import("../db/index");
+    const { messages } = await import("../db/schema");
+    const { randomUUID } = await import("node:crypto");
+    
+    await db.insert(messages).values({
+      id: randomUUID(),
+      senderId: user.id,
+      recipientId: data.recipientId,
+      subject: data.subject || null,
+      body: data.body,
+      isRead: 0,
+      parentId: null,
+      createdAt: Date.now(),
+    });
+    
+    return { ok: true };
+  });
+
+export const getMessages = createServerFn({ method: "POST" })
+  .validator((data: { sessionToken: string }) => data)
+  .handler(async ({ data }) => {
+    const { validateSessionToken } = await import("./auth-server");
+    const user = await validateSessionToken(data.sessionToken);
+    if (!user) return { error: "Not authenticated", messages: [] };
+    
+    const { db } = await import("../db/index");
+    const { messages, users } = await import("../db/schema");
+    const { eq, or, desc } = await import("drizzle-orm");
+    
+    const msgs = await db.select()
+      .from(messages)
+      .where(or(eq(messages.senderId, user.id), eq(messages.recipientId, user.id)))
+      .orderBy(desc(messages.createdAt))
+      .limit(50);
+    
+    // Enrich with sender/recipient names
+    const userIds = [...new Set(msgs.flatMap(m => [m.senderId, m.recipientId]))];
+    const userRows = await Promise.all(
+      userIds.map(uid => db.select().from(users).where(eq(users.id, uid)).limit(1).then(r => r[0]))
+    );
+    const userMap = Object.fromEntries(userRows.filter(Boolean).map(u => [u.id, u]));
+    
+    const enriched = msgs.map(m => ({
+      ...m,
+      senderName: userMap[m.senderId] ? `${userMap[m.senderId].firstName} ${userMap[m.senderId].lastName}` : "Unknown",
+      recipientName: userMap[m.recipientId] ? `${userMap[m.recipientId].firstName} ${userMap[m.recipientId].lastName}` : "Unknown",
+    }));
+    
+    return { messages: enriched };
+  });
+
+export const markMessageRead = createServerFn({ method: "POST" })
+  .validator((data: { sessionToken: string; messageId: string }) => data)
+  .handler(async ({ data }) => {
+    const { db } = await import("../db/index");
+    const { messages } = await import("../db/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    await db.update(messages).set({ isRead: 1 }).where(eq(messages.id, data.messageId));
+    return { ok: true };
+  });
