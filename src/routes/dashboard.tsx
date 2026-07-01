@@ -1,11 +1,51 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { logout } from "~/lib/server-fns";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { logout, getCurrentUser } from "~/lib/server-fns";
+import { useState, useEffect } from "react";
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[2]) : undefined;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+}
 
 export const Route = createFileRoute("/dashboard")({
   component: TeacherDashboard,
 });
 
 function TeacherDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = getCookie("session_token");
+      if (!token) {
+        window.location.href = "/login";
+        return;
+      }
+      const result = await getCurrentUser({ data: { sessionToken: token } });
+      if (!result.user) {
+        window.location.href = "/login";
+        return;
+      }
+      setUser(result.user);
+      setLoading(false);
+    };
+    checkAuth();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-gray-950">
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -14,13 +54,16 @@ function TeacherDashboard() {
             CareConnect
           </h1>
           <nav className="flex items-center gap-4">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {user?.firstName} {user?.lastName}
+            </span>
             <a href="/dashboard" className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
               Dashboard
             </a>
             <button
               onClick={async () => {
                 await logout();
-                localStorage.removeItem("session_token");
+                deleteCookie("session_token");
                 window.location.href = "/login";
               }}
               className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
@@ -42,7 +85,6 @@ function TeacherDashboard() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Classrooms Card */}
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               My Classrooms
@@ -60,7 +102,6 @@ function TeacherDashboard() {
             </div>
           </div>
 
-          {/* Points Card */}
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Points & Rewards
@@ -78,7 +119,6 @@ function TeacherDashboard() {
             </div>
           </div>
 
-          {/* Daily Reports Card */}
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Daily Reports

@@ -4,7 +4,6 @@ import type { AuthUser } from "~/lib/auth";
 export const login = createServerFn({ method: "POST" })
   .validator((data: { email: string; password: string }) => data)
   .handler(async ({ data }) => {
-    // Dynamic import to keep node:crypto out of client bundle
     const { authenticateUser, createSession } = await import("./auth-server");
     
     const user = await authenticateUser(data.email, data.password);
@@ -73,7 +72,13 @@ export const logout = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const getCurrentUser = createServerFn({ method: "GET" })
-  .handler(async () => {
-    return { user: null as AuthUser | null };
+export const getCurrentUser = createServerFn({ method: "POST" })
+  .validator((data: { sessionToken?: string }) => data)
+  .handler(async ({ data }) => {
+    if (!data.sessionToken) return { user: null as AuthUser | null };
+    
+    const { validateSessionToken } = await import("./auth-server");
+    const user = await validateSessionToken(data.sessionToken);
+    
+    return { user: user || null };
   });

@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { login } from "~/lib/server-fns";
 
+function setCookie(name: string, value: string, days: number) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+}
+
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
@@ -34,8 +43,7 @@ function LoginPage() {
               });
 
               if (result.user && "sessionToken" in result) {
-                // Store session token in localStorage and redirect
-                localStorage.setItem("session_token", result.sessionToken as string);
+                setCookie("session_token", result.sessionToken as string, 7);
                 const role = result.user.role;
                 if (role === "teacher" || role === "admin") {
                   window.location.href = "/dashboard";
