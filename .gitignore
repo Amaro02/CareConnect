@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.tanstack/
+data/
+*.db
+.env
+.env.local
+.run/
