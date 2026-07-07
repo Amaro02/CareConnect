@@ -208,9 +208,14 @@ function Home() {
             </div>
 
             <div className="rounded-lg border-2 border-indigo-500 bg-white p-8 shadow-lg dark:bg-gray-900">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Facility
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Facility
+                </h3>
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-300">
+                  Free trial available
+                </span>
+              </div>
               <p className="mt-4 text-4xl font-bold text-gray-900 dark:text-gray-100">
                 $99
               </p>
@@ -224,7 +229,7 @@ function Home() {
                 <li className="flex items-center gap-2">✓ Priority support</li>
               </ul>
               <a
-                href="/signup"
+                href="https://buy.stripe.com/fZubJ013F6Ho5n0gmggw000"
                 className="mt-8 block w-full rounded-md bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
               >
                 Get started
